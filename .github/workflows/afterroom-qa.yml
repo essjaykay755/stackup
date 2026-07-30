@@ -28,7 +28,7 @@ jobs:
           sed -i 's#afterroom-raw/#a/#g; s#afterroom-v2/room-that-learns-you-r3f-source/#b/#g' motion.patch
           cat afterroom-v2/behavior-v2-*.b64 | base64 -d > behavior.patch.gz
           gzip -d behavior.patch.gz
-          sed -i 's#a/mnt/data/afterroom_motion_base/#a/#g; s#b/mnt/data/afterroom_full_test/#b/#g' behavior.patch
+          sed -i 's#/mnt/data/afterroom_motion_base/#a/#g; s#/mnt/data/afterroom_full_test/#b/#g' behavior.patch
           cd app
           git apply --unsafe-paths --whitespace=nowarn ../motion.patch
           git apply --unsafe-paths --whitespace=nowarn ../behavior.patch
