@@ -1,0 +1,67 @@
+name: AFTERROOM Behavioral QA
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: afterroom-v2/package-lock.json
+
+      - name: Reconstruct source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app
+          cat afterroom-v2/part-*.b64 | base64 -d > source.tar.gz
+          tar -xzf source.tar.gz -C app
+          cat afterroom-v2/motion-fix-*.b64 | base64 -d > motion.patch.gz
+          gzip -d motion.patch.gz
+          sed -i 's#afterroom-raw/#a/#g; s#afterroom-v2/room-that-learns-you-r3f-source/#b/#g' motion.patch
+          cat afterroom-v2/behavior-final-*.b64 | base64 -d > behavior.patch.gz
+          gzip -d behavior.patch.gz
+          cd app
+          git apply --unsafe-paths --whitespace=nowarn ../motion.patch
+          git apply --unsafe-paths --whitespace=nowarn ../behavior.patch
+
+      - name: Install and build
+        working-directory: app
+        run: |
+          npm install --no-audit --no-fund
+          npm run check
+          npm run build
+
+      - name: Prepare browser QA
+        run: |
+          cat afterroom-v2/behavior-qa-fast-*.b64 | base64 -d > qa.mjs.gz
+          gzip -d qa.mjs.gz
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund puppeteer-core@24.15.0 @sparticuz/chromium@138.0.0
+
+      - name: Run behavioral QA
+        run: node qa.mjs
+
+      - name: Print QA results
+        if: always()
+        run: cat qa-output/qa-results.json || true
+
+      - name: Require QA pass
+        run: node -e "const q=require('./qa-output/qa-results.json'); if(!q.checks?.pass) { console.error(q); process.exit(1) }"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afterroom-behavior-qa
+          path: |
+            app/dist
+            qa-output
